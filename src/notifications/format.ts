@@ -28,6 +28,7 @@ import { appUrlFor } from "./app-links.js";
 import { groupDigestEvents } from "./digest-grouping.js";
 import { confidenceIndicator } from "./confidence.js";
 import { settlementLines } from "./settlement.js";
+import { formatDeadline } from "./time.js";
 import type { StellarConfig } from "../config.js";
 import {
   EXPLORER_BUTTON_TEXT,
@@ -442,6 +443,7 @@ function headline(event: DecodedEvent, nowMs?: number): string | null {
         who(p.captain),
         escapeMd(String(p.feeBps)),
         escapeMd(formatDeadline(p.deadline, nowMs)),
+        p.category ? escapeMd(clip(p.category)) : null,
       );
 
     case "deposited":
@@ -628,6 +630,7 @@ function plainHeadline(event: DecodedEvent, nowMs?: number): string | null {
         plainWho(p.captain),
         String(p.feeBps),
         formatDeadline(p.deadline, nowMs),
+        p.category ? clip(p.category) : null,
       );
 
     case "deposited":
