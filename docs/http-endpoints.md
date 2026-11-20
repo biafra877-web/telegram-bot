@@ -323,6 +323,16 @@ The metrics registry tracks:
 | `mimir_bot_notifications_failed_total` | counter | Telegram sends that threw (cursor still advanced) |
 | `mimir_bot_stale_cursor_events_total` | counter | Times a stale-cursor warning was emitted |
 | `mimir_bot_consecutive_failures` | gauge | Current consecutive full-cycle RPC failures (resets on success) |
+| `mimir_bot_last_cycle_events` | gauge | Events observed in the most recent complete poll cycle |
+| `mimir_bot_activity_baseline_events` | gauge | Rolling mean events per cycle at the most recent baseline comparison |
+| `mimir_bot_activity_anomalies_total` | counter | Complete cycles classified as a spike or drop against the rolling baseline |
+| `mimir_bot_notification_age_samples_total` | counter | Confirmed notifications with a known ledger close time (includes `0` ms lag) |
+| `mimir_bot_notification_age_missing_ledger_time_total` | counter | Confirmed notifications whose event lacked a valid ledger close time |
+| `mimir_bot_notification_age_ms_total` | counter | Cumulative end-to-end age (ms) from ledger close time to confirmed send |
+| `mimir_bot_last_notification_age_ms` | gauge | End-to-end age (ms) of the most recent confirmed notification with a known ledger time |
+| `mimir_bot_max_notification_age_ms` | gauge | Maximum observed end-to-end notification age (ms) across confirmed sends |
+
+> **Note:** Missing ledger close times increment `mimir_bot_notification_age_missing_ledger_time_total` without incrementing `mimir_bot_notification_age_samples_total` or overwriting `mimir_bot_last_notification_age_ms`, distinguishing absent chain timestamps from `0` ms delivery lag.
 
 ```bash
 METRICS_PORT=9090  # in .env or environment

@@ -163,6 +163,40 @@ test("activity baseline: rendered metrics expose the last count and baseline", (
   assert.ok(output.includes("mimir_bot_activity_anomalies_total 2"), output);
 });
 
+test("notification age: distinguishes missing ledger time from zero delivery lag", () => {
+  const m = createMetrics();
+
+  // Zero delivery lag is a valid sample.
+  m.recordNotificationAge(0);
+  assert.equal(m.notificationAgeSamples.value(), 1);
+  assert.equal(m.notificationAgeMissingLedgerTime.value(), 0);
+  assert.equal(m.notificationAgeTotalMs.value(), 0);
+  assert.equal(m.lastNotificationAgeMs.value(), 0);
+  assert.equal(m.maxNotificationAgeMs.value(), 0);
+
+  // Positive age updates last, max, and cumulative total.
+  m.recordNotificationAge(1250.4);
+  assert.equal(m.notificationAgeSamples.value(), 2);
+  assert.equal(m.notificationAgeTotalMs.value(), 1250);
+  assert.equal(m.lastNotificationAgeMs.value(), 1250);
+  assert.equal(m.maxNotificationAgeMs.value(), 1250);
+
+  // Missing ledger time increments missing counter without overwriting last/max/samples.
+  m.recordNotificationAge(null);
+  assert.equal(m.notificationAgeSamples.value(), 2);
+  assert.equal(m.notificationAgeMissingLedgerTime.value(), 1);
+  assert.equal(m.notificationAgeTotalMs.value(), 1250);
+  assert.equal(m.lastNotificationAgeMs.value(), 1250);
+  assert.equal(m.maxNotificationAgeMs.value(), 1250);
+
+  const output = m.render();
+  assert.ok(output.includes("mimir_bot_notification_age_samples_total 2"), output);
+  assert.ok(output.includes("mimir_bot_notification_age_missing_ledger_time_total 1"), output);
+  assert.ok(output.includes("mimir_bot_notification_age_ms_total 1250"), output);
+  assert.ok(output.includes("mimir_bot_last_notification_age_ms 1250"), output);
+  assert.ok(output.includes("mimir_bot_max_notification_age_ms 1250"), output);
+});
+
 // ── render() format tests ─────────────────────────────────────────────────────
 
 test("render: output ends with a newline", () => {
@@ -188,6 +222,11 @@ test("render: contains all expected metric names", () => {
     "mimir_bot_last_cycle_events",
     "mimir_bot_activity_baseline_events",
     "mimir_bot_activity_anomalies_total",
+    "mimir_bot_notification_age_samples_total",
+    "mimir_bot_notification_age_missing_ledger_time_total",
+    "mimir_bot_notification_age_ms_total",
+    "mimir_bot_last_notification_age_ms",
+    "mimir_bot_max_notification_age_ms",
   ];
 
   for (const name of expectedNames) {

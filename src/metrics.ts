@@ -89,6 +89,24 @@ export interface MetricsRegistry {
   /** Complete cycles classified as a spike or drop against the rolling
    *  activity baseline. */
   activityAnomalies: Counter;
+  /** Total confirmed notifications with a known ledger close time (includes 0ms lag). */
+  notificationAgeSamples: Counter;
+  /** Total confirmed notifications whose event lacked a valid ledger close time. */
+  notificationAgeMissingLedgerTime: Counter;
+  /** Cumulative end-to-end notification age in milliseconds across known-ledger-time samples. */
+  notificationAgeTotalMs: Counter;
+  /** End-to-end age in ms of the most recent confirmed notification with a known ledger time. */
+  lastNotificationAgeMs: Gauge;
+  /** Maximum observed end-to-end notification age in ms across confirmed sends. */
+  maxNotificationAgeMs: Gauge;
+
+  /**
+   * Record one confirmed notification's end-to-end age in milliseconds, or `null`
+   * when the source event lacked a valid ledger close time. Distinguishes missing
+   * ledger time (`notificationAgeMissingLedgerTime`) from zero delivery lag
+   * (`notificationAgeSamples` incremented with `0` ms).
+   */
+  recordNotificationAge(ageMs: number | null): void;
 
   /**
    * Render the registry as a Prometheus text exposition string.
@@ -195,6 +213,26 @@ export function createMetrics(): MetricsRegistry {
     `${METRICS_PREFIX}activity_anomalies_total`,
     "Complete poll cycles classified as a spike or drop against the rolling activity baseline.",
   );
+  const notificationAgeSamples = makeCounter(
+    `${METRICS_PREFIX}notification_age_samples_total`,
+    "Total confirmed notifications with a known ledger close time (includes 0ms lag).",
+  );
+  const notificationAgeMissingLedgerTime = makeCounter(
+    `${METRICS_PREFIX}notification_age_missing_ledger_time_total`,
+    "Total confirmed notifications whose event lacked a valid ledger close time.",
+  );
+  const notificationAgeTotalMs = makeCounter(
+    `${METRICS_PREFIX}notification_age_ms_total`,
+    "Cumulative end-to-end notification age in milliseconds from ledger close time to confirmed send.",
+  );
+  const lastNotificationAgeMs = makeGauge(
+    `${METRICS_PREFIX}last_notification_age_ms`,
+    "End-to-end age in milliseconds of the most recent confirmed notification with a known ledger close time.",
+  );
+  const maxNotificationAgeMs = makeGauge(
+    `${METRICS_PREFIX}max_notification_age_ms`,
+    "Maximum observed end-to-end notification age in milliseconds from ledger close time to confirmed send.",
+  );
 
   const counters = [
     pollCycles,
@@ -206,8 +244,31 @@ export function createMetrics(): MetricsRegistry {
     notificationsFailed,
     staleCursorEvents,
     activityAnomalies,
+    notificationAgeSamples,
+    notificationAgeMissingLedgerTime,
+    notificationAgeTotalMs,
   ];
-  const gauges = [consecutiveFailures, lastCycleEvents, activityBaselineEvents];
+  const gauges = [
+    consecutiveFailures,
+    lastCycleEvents,
+    activityBaselineEvents,
+    lastNotificationAgeMs,
+    maxNotificationAgeMs,
+  ];
+
+  function recordNotificationAge(ageMs: number | null): void {
+    if (ageMs === null || typeof ageMs !== "number" || !Number.isFinite(ageMs)) {
+      notificationAgeMissingLedgerTime.inc();
+      return;
+    }
+    const clampedMs = Math.max(0, Math.round(ageMs));
+    notificationAgeSamples.inc();
+    notificationAgeTotalMs.inc(clampedMs);
+    lastNotificationAgeMs.set(clampedMs);
+    if (clampedMs > maxNotificationAgeMs.value()) {
+      maxNotificationAgeMs.set(clampedMs);
+    }
+  }
 
   function render(): string {
     const lines: string[] = [];
@@ -306,6 +367,12 @@ export function createMetrics(): MetricsRegistry {
     lastCycleEvents,
     activityBaselineEvents,
     activityAnomalies,
+    notificationAgeSamples,
+    notificationAgeMissingLedgerTime,
+    notificationAgeTotalMs,
+    lastNotificationAgeMs,
+    maxNotificationAgeMs,
+    recordNotificationAge,
     render,
     startServer,
   };
