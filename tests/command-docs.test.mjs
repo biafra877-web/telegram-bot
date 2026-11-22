@@ -74,11 +74,11 @@ test("operator-only commands are exactly audit, pause, and resume", () => {
   assert.deepEqual(operatorCommands.sort(), ["audit", "pause", "resume"].sort());
 });
 
-test("allowlist-gated commands are exactly status, events, contracts, health, and preview", () => {
+test("allowlist-gated commands are exactly status, contracts, health, preview, and categories", () => {
   const gatedCommands = COMMANDS.filter(isAllowlistGated).map((c) => c.command);
   assert.deepEqual(
     gatedCommands.sort(),
-    ["contracts", "events", "health", "preview", "status"].sort(),
+    ["categories", "contracts", "health", "preview", "status"].sort(),
   );
 });
 
