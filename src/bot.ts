@@ -28,6 +28,7 @@ import {
   chatAllowed,
   commandArgumentAllowed,
   commandMetadata,
+  isCommandForAnotherBot,
   isOperator,
   operatorAllowed,
   registeredCommands,
@@ -82,6 +83,8 @@ export {
   contractsMessage,
   healthMessage,
   lastEventMessage,
+  menuKeyboard,
+  menuMessage,
   pauseMessage,
   RecentEventStore,
   resumeMessage,
@@ -90,6 +93,7 @@ export {
   type CanonicalEventSummary,
 } from "./commands/index.js";
 export {
+  CALLBACK_CHAT_UNAUTHORIZED_FEEDBACK,
   CALLBACK_FALLBACK_FEEDBACK,
   CALLBACK_FALLBACK_PAYLOAD,
   CALLBACK_UNAUTHORIZED_FEEDBACK,
@@ -269,6 +273,7 @@ export function registerCommandHandlers(bot: Bot | CommandRegistrar, deps: BotDe
   const modules = registeredCommands();
   for (const module of modules) {
     registrar.command(module.command, async (ctx) => {
+      if (isCommandForAnotherBot(ctx)) return;
       if (!withinRateLimit(ctx, module.command)) return;
       await dispatch(module, ctx, deps);
     });
@@ -343,13 +348,9 @@ function registerUnknownCommandFallback(
     const raw = text.slice(1, cmdEntity.length);
     const atIndex = raw.indexOf("@");
     const cmdName = atIndex === -1 ? raw : raw.slice(0, atIndex);
-    const mention = atIndex === -1 ? null : raw.slice(atIndex + 1);
 
     // If it targets another bot, ignore.
-    if (mention !== null) {
-      const myUsername = (ctx as unknown as { me?: { username?: string } }).me?.username;
-      if (myUsername && mention.toLowerCase() !== myUsername.toLowerCase()) return;
-    }
+    if (isCommandForAnotherBot(ctx)) return;
 
     // Already handled by a known-command handler — do nothing.
     if (knownCommandNames.includes(cmdName)) return;
@@ -379,57 +380,11 @@ export function createBot(deps: BotDeps): Bot {
   // It is deliberately not re-litigated here: `createBot` is also the entry
   // point for tests and embedders that never speak to Telegram, and a
   // placeholder token must not stop them building a bot.
-  const bot = new Bot(
-    deps.config.botToken,
-    deps.botInfo !== undefined
-      ? { botInfo: deps.botInfo, ...clientOptions }
-      : clientOptions,
-  );
+  const bot = new Bot(deps.config.botToken, clientOptions);
+
   registerCommandHandlers(bot, deps);
   registerCallbackHandlers(bot, deps);
   registerBroadcastHandlers(bot, deps);
 
-  // grammy rethrows handler errors by default, which would take the process
-  // with it. Keep Telegram/RPC error text bounded and redact known secrets.
-  bot.catch((err) => {
-    if (err.ctx?.callbackQuery) {
-      console.error(
-        formatCallbackErrorLog({
-          ctx: err.ctx,
-          action: "callback_query",
-          prefix: "[bot] handler error",
-          error: err.error,
-          secrets: [deps.config.botToken],
-        }),
-      );
-      return;
-    }
-    console.error(
-      `[bot] handler error on update ${err.ctx.update.update_id}: ` +
-        safeErrorMessage(err.error, [deps.config.botToken]),
-    );
-  });
-
   return bot;
-}
-
-// Notifier moved to src/notifications/notifier.ts — re-exported here so all
-// existing imports from "bot.js" keep resolving without modification.
-export {
-  createNotifier,
-  isMarkdownParseError,
-  notifierSkips,
-  type SendExtra,
-} from "./notifications/notifier.js";
-
-/** Registers the command list so Telegram's UI offers autocompletion. */
-export async function registerCommands(bot: Bot, config?: BotConfig): Promise<void> {
-  try {
-    await bot.api.setMyCommands(
-      visibleCommandMetadata(config).map(({ command, description }) => ({ command, description })),
-    );
-  } catch (err) {
-    // Cosmetic. Never worth failing a boot over, and never log an unbounded API error.
-    console.warn(`[bot] setMyCommands failed: ${safeErrorMessage(err)}`);
-  }
 }

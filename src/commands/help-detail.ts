@@ -36,6 +36,14 @@ export const COMMAND_DETAILS: Record<string, CommandDetail> = {
     description: "Show the bot version, the Stellar network it watches, and where its source lives.",
     examples: ["/about"],
   },
+  menu: {
+    usage: "/menu",
+    arguments: "None",
+    whoCanRun: "Anyone in allowed chats",
+    operatorOnly: false,
+    description: "Show an interactive navigation menu with buttons for status, contracts, and help.",
+    examples: ["/menu"],
+  },
   status: {
     usage: "/status",
     arguments: "None",
@@ -67,6 +75,14 @@ export const COMMAND_DETAILS: Record<string, CommandDetail> = {
     operatorOnly: false,
     description: "Display watched Soroban contract addresses (market and squad) with links to Stellar block explorers.",
     examples: ["/contracts"],
+  },
+  filters: {
+    usage: "/filters",
+    arguments: "None",
+    whoCanRun: "Anyone in allowed chats",
+    operatorOnly: false,
+    description: "Display active notification filters, global feature flags, category allowlists, and redacted chat routing settings.",
+    examples: ["/filters"],
   },
   health: {
     usage: "/health",
